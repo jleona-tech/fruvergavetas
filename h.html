@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Dashboard FRUVER</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
+<style>
+body{font-family:Arial;background:#eef2f7;margin:20px}
+h1{text-align:center}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{background:white;padding:15px;border-radius:10px;box-shadow:0 3px 6px rgba(0,0,0,0.1)}
+.big{font-size:30px;text-align:center;margin-top:10px}
+</style>
+</head>
+
+<body>
+
+<h1>📦 Dashboard Recuperación Gavetas FRUVER</h1>
+
+<div class="grid">
+
+<div class="card">
+<h3>Total deuda</h3>
+<div id="total" class="big">...</div>
+</div>
+
+<div class="card">
+<h3>Índice recuperación</h3>
+<div id="indice" class="big">...</div>
+</div>
+
+<div class="card"><canvas id="ranking"></canvas></div>
+<div class="card"><canvas id="pareto"></canvas></div>
+<div class="card"><canvas id="evol"></canvas></div>
+<div class="card"><canvas id="aging"></canvas></div>
+
+</div>
+
+<script>
+
+const url="https://docs.google.com/spreadsheets/d/e/2PACX-1vRKDt3OhqiTwY3aJ-TYfP1-HcXCb6EPSn4xJHl02UqapMUGXZKWQU0fXpzB22E_nA/pub?gid=XXXXXXXX&single=true&output=csv"
+// 👆 IMPORTANTE: aquí debes pegar el CSV de KPI_TIENDA
+
+Papa.parse(url,{
+download:true,
+header:true,
+complete:function(res){
+
+const data=res.data.filter(x=>x.Tienda)
+
+const tiendas=data.map(x=>x.Tienda)
+const saldo=data.map(x=>Number(x.Saldo)||0)
+const cumplimiento=data.map(x=>Number(x["% Cumplimiento"])||0)
+const aging=data.map(x=>Number(x["Aging Promedio"])||0)
+
+const total=saldo.reduce((a,b)=>a+b,0)
+document.getElementById("total").innerText=Math.round(total)
+
+const ind= cumplimiento.reduce((a,b)=>a+b,0)/cumplimiento.length
+document.getElementById("indice").innerText=(ind*100).toFixed(0)+"%"
+
+new Chart(ranking,{
+type:'bar',
+data:{labels:tiendas,datasets:[{label:'Saldo',data:saldo}]}
+})
+
+const sorted=[...saldo].sort((a,b)=>b-a)
+const cum=[]
+sorted.reduce((a,b,i)=>cum[i]=a+b,0)
+
+new Chart(pareto,{
+type:'line',
+data:{labels:sorted.map((_,i)=>i+1),datasets:[{label:'Pareto',data:cum}]}
+})
+
+new Chart(evol,{
+type:'line',
+data:{labels:tiendas,datasets:[{label:'Cumplimiento',data:cumplimiento}]}
+})
+
+new Chart(aging,{
+type:'bar',
+data:{labels:tiendas,datasets:[{label:'Aging',data:aging}]}
+})
+
+}})
+
+</script>
+
+</body>
+</html>
