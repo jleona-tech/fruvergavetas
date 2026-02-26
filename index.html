@@ -1,102 +1,107 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Dashboard FRUVER</title>
+  <meta charset="UTF-8">
+  <title>Dashboard Logístico FRUVER</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
-
-<style>
-body{font-family:Arial;background:#f4f6f9;margin:20px}
-h1{color:#2c3e50}
-.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}
-.card{background:white;padding:15px;border-radius:10px;text-align:center;box-shadow:0 2px 5px rgba(0,0,0,0.1)}
-.big{font-size:22px;font-weight:bold}
-canvas{background:white;border-radius:10px;padding:10px;margin-bottom:20px}
-</style>
-
+  <style>
+    body {font-family: Arial; margin: 40px; background:#f5f6fa;}
+    h1 {text-align:center;}
+    .grid {display:grid; grid-template-columns: 1fr 1fr; gap:40px;}
+    canvas {background:white; padding:20px; border-radius:10px;}
+    table {border-collapse: collapse; width:100%; background:white;}
+    th, td {border:1px solid #ddd; padding:8px;}
+    th {background:#2f3640; color:white;}
+  </style>
 </head>
 
 <body>
 
-<h1>📊 Dashboard FRUVER Logístico</h1>
+<h1>📦 Dashboard Logístico FRUVER</h1>
 
 <div class="grid">
-<div class="card"><div>Total enviado</div><div id="kpi1" class="big">-</div></div>
-<div class="card"><div>Total devuelto</div><div id="kpi2" class="big">-</div></div>
-<div class="card"><div>Saldo total</div><div id="kpi3" class="big">-</div></div>
-<div class="card"><div>% cumplimiento</div><div id="kpi4" class="big">-</div></div>
-<div class="card"><div>Aging promedio</div><div id="kpi5" class="big">-</div></div>
-<div class="card"><div>Score global</div><div id="kpi6" class="big">-</div></div>
+  <canvas id="saldoChart"></canvas>
+  <canvas id="cumplimientoChart"></canvas>
 </div>
 
-<canvas id="saldoChart"></canvas>
-<canvas id="scoreChart"></canvas>
-<canvas id="scatterChart"></canvas>
-<canvas id="paretoChart"></canvas>
+<h2>🏆 Ranking crítico tiendas</h2>
+<table id="tablaRanking">
+<thead>
+<tr>
+<th>Tienda</th>
+<th>Saldo</th>
+<th>% Cumplimiento</th>
+<th>Aging</th>
+<th>Score</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
 
 <script>
 
-// ⭐ TU CSV KPI_TIENDA
-const url="https://docs.google.com/spreadsheets/d/e/2PACX-1vRKDt3OhqiTwY3aJ-TYfP1-HcXCb6EPSn4xJHl02UqapMUGXZKWQU0fXpzB22E_nA/pub?gid=1273729648&single=true&output=csv";
+const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKDt3OhqiTwY3aJ-TYfP1-HcXCb6EPSn4xJHl02UqapMUGXZKWQU0fXpzB22E_nA/pub?gid=1273729648&single=true&output=csv";
 
-Papa.parse(url,{
-download:true,
-header:true,
-complete:function(results){
+fetch(sheetURL)
+.then(res => res.text())
+.then(data => {
 
-const data=results.data.filter(x=>x.Tienda);
+  const rows = data.trim().split("\n").slice(1);
 
-const tiendas=data.map(x=>x.Tienda);
-const enviado=data.map(x=>+x.Enviado||0);
-const devuelto=data.map(x=>+x.Devuelto||0);
-const saldo=data.map(x=>+x.Saldo||0);
-const cumpl=data.map(x=>+x["% Cumplimiento"]*100||0);
-const aging=data.map(x=>+x["Aging Promedio"]||0);
-const score=data.map(x=>+x.Score||0);
+  let tiendas=[], saldo=[], cumplimiento=[], aging=[], score=[];
+  let ranking=[];
 
-// ===== KPI =====
-const sum=a=>a.reduce((a,b)=>a+b,0);
-document.getElementById("kpi1").innerHTML=sum(enviado).toLocaleString();
-document.getElementById("kpi2").innerHTML=sum(devuelto).toLocaleString();
-document.getElementById("kpi3").innerHTML=sum(saldo).toLocaleString();
-document.getElementById("kpi4").innerHTML=(sum(devuelto)/sum(enviado)*100).toFixed(1)+"%";
-document.getElementById("kpi5").innerHTML=(sum(aging)/aging.length).toFixed(1);
-document.getElementById("kpi6").innerHTML=(sum(score)/score.length).toFixed(2);
+  rows.forEach(r => {
 
-// ===== Ranking saldo =====
-new Chart(saldoChart,{
-type:"bar",
-data:{labels:tiendas,datasets:[{label:"Saldo",data:saldo}]},
-options:{indexAxis:"y"}
+    const c = r.split(",");
+
+    const tienda=c[0];
+    const sal=Number(c[3]);
+    const cump=Number(c[4])*100;
+    const age=Number(c[5]);
+    const sco=Number(c[6])*100;
+
+    tiendas.push(tienda);
+    saldo.push(sal);
+    cumplimiento.push(cump);
+    aging.push(age);
+    score.push(sco);
+
+    ranking.push({tienda, sal, cump, age, sco});
+
+  });
+
+  // ordenar ranking crítico
+  ranking.sort((a,b)=>b.sal-a.sal);
+
+  const tbody=document.querySelector("#tablaRanking tbody");
+
+  ranking.slice(0,15).forEach(r=>{
+    tbody.innerHTML+=`
+      <tr>
+        <td>${r.tienda}</td>
+        <td>${r.sal}</td>
+        <td>${r.cump.toFixed(1)}%</td>
+        <td>${r.age.toFixed(1)}</td>
+        <td>${r.sco.toFixed(1)}</td>
+      </tr>`;
+  });
+
+  // gráfico saldo
+  new Chart(document.getElementById("saldoChart"), {
+    type:'bar',
+    data:{labels:tiendas, datasets:[{label:'Saldo por tienda', data:saldo}]}
+  });
+
+  // gráfico cumplimiento
+  new Chart(document.getElementById("cumplimientoChart"), {
+    type:'bar',
+    data:{labels:tiendas, datasets:[{label:'% Cumplimiento', data:cumplimiento}]}
+  });
+
 });
 
-// ===== Ranking score =====
-new Chart(scoreChart,{
-type:"bar",
-data:{labels:tiendas,datasets:[{label:"Score",data:score}]}
-});
-
-// ===== Scatter =====
-new Chart(scatterChart,{
-type:"scatter",
-data:{datasets:[{
-label:"Score vs Aging",
-data:tiendas.map((t,i)=>({x:aging[i],y:score[i]}))
-}]}
-});
-
-// ===== Pareto =====
-const sorted=[...saldo].sort((a,b)=>b-a);
-let cum=0;
-const pareto=sorted.map(x=>cum+=x);
-new Chart(paretoChart,{
-type:"line",
-data:{labels:sorted,datasets:[{label:"Pareto saldo",data:pareto}]}
-});
-
-}});
 </script>
 
 </body>
